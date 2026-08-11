@@ -1,46 +1,41 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { STATIC_GAMES, getMockMonthlyChart, WHATSAPP_URL, WHATSAPP_NUMBER } from '../lib/mockData';
 
-const FLOAT_ANIMS  = ['float-a', 'float-b', 'float-c'];
-const FLOAT_DURS   = [4.2, 5.1, 6.4, 7.8, 5.6, 4.8, 6.9, 3.8, 7.2, 5.3];
-const FLOAT_DELAYS = [0, 0.8, 1.6, 2.4, 0.4, 1.2, 2.0, 0.6, 1.8, 2.8];
-const FLOAT_AMPS   = [10, 14, 18, 12, 16, 11, 15, 13, 17, 9];
-const MONTH_NAMES  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const REFRESH_MS   = 15_000;
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December'
+];
+const REFRESH_MS = 15_000;
 
 export default function HomePage() {
-  const [games, setGames]           = useState([]);
-  const [todayDate, setTodayDate]   = useState('');
-  const [yesterdayDate, setYDate]   = useState('');
+  const [games, setGames]           = useState(STATIC_GAMES);
+  const [todayDate, setTodayDate]   = useState(() => new Date().toISOString().split('T')[0]);
+  const [yesterdayDate, setYDate]   = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  });
   const [searchQ, setSearchQ]       = useState('');
-  const [clock, setClock]           = useState('');
-  const [chartData, setChartData]   = useState(null);
-  const [chartMonth, setChartMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2,'0'));
+  const [chartMonth, setChartMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [chartYear, setChartYear]   = useState(() => String(new Date().getFullYear()));
-  const prevNums = useRef({});
+  const [chartData, setChartData]   = useState(() => getMockMonthlyChart(String(new Date().getMonth() + 1).padStart(2, '0'), String(new Date().getFullYear())));
 
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      setClock(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) + ' IST');
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-
+  // Fetch today results with fallback
   const loadResults = useCallback(async () => {
     try {
       const res = await fetch('/api/results/today');
+      if (!res.ok) throw new Error('API failed');
       const json = await res.json();
-      if (!json.success) return;
-      setGames(json.data);
-      setTodayDate(json.today_date);
-      setYDate(json.yesterday_date);
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setGames(json.data);
+        if (json.today_date) setTodayDate(json.today_date);
+        if (json.yesterday_date) setYDate(json.yesterday_date);
+      }
     } catch (e) {
-      console.warn('[SK] API error:', e.message);
+      console.warn('[SK] Using static data fallback:', e.message);
     }
   }, []);
 
@@ -50,36 +45,36 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, [loadResults]);
 
+  // Load monthly chart with fallback
   const loadChart = useCallback(async (month, year) => {
     try {
       const res = await fetch(`/api/chart/monthly?month=${month}&year=${year}`);
+      if (!res.ok) throw new Error('Chart API failed');
       const json = await res.json();
-      if (json.success) setChartData(json);
+      if (json.success && json.rows) {
+        setChartData(json);
+        return;
+      }
     } catch (e) {
-      console.warn('[SK] Chart error:', e.message);
+      // Fallback
     }
+    setChartData(getMockMonthlyChart(month, year));
   }, []);
 
-  useEffect(() => { loadChart(chartMonth, chartYear); }, [loadChart, chartMonth, chartYear]);
+  useEffect(() => {
+    loadChart(chartMonth, chartYear);
+  }, [loadChart, chartMonth, chartYear]);
 
   const filtered = searchQ
     ? games.filter(g => g.name.toLowerCase().includes(searchQ.toLowerCase()) || g.code.toLowerCase().includes(searchQ.toLowerCase()))
     : games;
 
-  const heroes = games.filter(g => g.is_highlight && g.is_main).slice(0, 4);
+  const topHero = games.find(g => g.is_highlight && g.is_main) || games[0];
 
-  const fmt = (d) => {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-IN', { weekday:'short', day:'numeric', month:'short' });
+  const goToMonth = (month, year) => {
+    setChartMonth(month);
+    setChartYear(year);
   };
-
-  const categories = [
-    { key: 'LIVE', label: '🔴 LIVE — RECENT DRAWS',  cls: '' },
-    { key: 'NEXT', label: '⏳ UPCOMING DRAWS',        cls: 'cat-next' },
-    { key: 'REST', label: '✓  COMPLETED DRAWS',       cls: 'cat-rest' },
-  ];
-
-  const goToMonth = (month, year) => { setChartMonth(month); setChartYear(year); };
 
   const mIdx = parseInt(chartMonth, 10) - 1;
   const prevMIdx = mIdx === 0 ? 11 : mIdx - 1;
@@ -88,150 +83,233 @@ export default function HomePage() {
   const nextYear = mIdx === 11 ? parseInt(chartYear) + 1 : parseInt(chartYear);
   const todayDay = todayDate ? todayDate.split('-')[2] : '';
 
+  const fmtDay = (d) => {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  };
+
+  const SpinnerIcon = () => (
+    <span className="wait-spinner" title="रिजल्ट का इंतज़ार">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+        <circle cx="12" cy="12" r="9.5" />
+        <line className="clock-hand" x1="12" y1="12" x2="12" y2="6.5" />
+      </svg>
+    </span>
+  );
+
   return (
     <div id="wrapper">
-      <div className="scanlines" aria-hidden="true" />
-      <header id="header">
-        <div className="header-inner">
-          <div className="brand">
-            <div className="brand-icon" aria-hidden="true">♚</div>
-            <div>
-              <div className="brand-name">SATTA KING LIVE</div>
-              <div className="brand-sub">LIVE STREAMING RESULTS &amp; CHARTS</div>
-            </div>
-          </div>
-          <div className="header-search">
-            <input type="text" id="game-search-input" placeholder="Search game…" autoComplete="off" aria-label="Search games" value={searchQ} onChange={e => setSearchQ(e.target.value)} />
-          </div>
-          <div className="header-live-badge">
-            <span className="live-dot" />
-            LIVE&nbsp;·&nbsp;<time id="live-timestamp">{clock}</time>
-          </div>
+      {/* ── BREAKING RESULT FLASH BAR ── */}
+      {topHero && (
+        <div className="lrs">
+          <span className="lrs-tag"><i className="lrs-dot" />अभी आया रिजल्ट</span>
+          <span className="lrs-game">{topHero.name}</span>
+          <span className="lrs-time">({topHero.draw_time})</span>
+          <span className="lrs-arrow">&#10148;</span>
+          <span className="lrs-num">{topHero.today_number === 'XX' || topHero.today_number === '--' ? '??' : topHero.today_number}</span>
+          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="btn-wa-app" style={{ padding: '2px 10px', fontSize: '11px', marginLeft: 8 }}>
+            💬 WhatsApp
+          </a>
         </div>
+      )}
+
+      {/* ── STICKY APP BAR ── */}
+      <header className="appbar">
+        <span className="burger">&#9776;</span>
+        <span className="title">SATTA KING LIVE</span>
+        <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="btn-wa-app" style={{ marginLeft: 'auto' }}>
+          💬 WhatsApp
+        </a>
+        <span className="wallet">{games.length} गेम</span>
       </header>
 
-      <main id="container">
-        <div className="seo-strip" role="note">
-          <h1 style={{ fontSize: 'inherit', fontWeight: 400, display: 'inline' }}>
-            Satta King Live — Daily Result 2026. Stream Live Numbers for Gali, Desawar, Ghaziabad &amp; Faridabad with Complete Monthly Chart Archive.
-          </h1>
-        </div>
-        <div className="disclaimer-banner" role="note">
-          <span className="disc-badge">DISCLAIMER</span>
-          <span>Informational portal only — non-transactional. Users must comply with applicable local laws.</span>
-        </div>
-
-        <div className="section-head">
-          <span className="section-title">◉ LIVE DRAWS</span>
-          <span className="section-meta">Real-time · Updates every 15s</span>
+      <div className="wrap">
+        {/* ── WHATSAPP HERO BANNER ── */}
+        <div className="wa-app-banner">
+          <div>
+            <div className="wa-app-title">👑 सीधा खाईवाल से गेम पास करवाएं</div>
+            <div className="wa-app-sub">सिंगल जोड़ी और हरूफ के लिए WhatsApp करें &bull; {WHATSAPP_NUMBER}</div>
+          </div>
+          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="action" style={{ background: '#ffffff', color: '#0c3e23' }}>
+            📲 WhatsApp चैट
+          </a>
         </div>
 
-        <div className="live-hero-section">
-          <div className="live-hero-grid" id="hero-grid">
-            {heroes.map((g, i) => {
-              const isPending = g.today_number === 'XX' || g.today_number === '--';
-              return (
-                <div key={g.code} className="hero-card" id={`hero-${g.code}`} style={{ '--float-dur': `${FLOAT_DURS[i % FLOAT_DURS.length]}s`, '--float-delay': `-${FLOAT_DELAYS[i % FLOAT_DELAYS.length]}s`, '--float-amp': `${FLOAT_AMPS[i % FLOAT_AMPS.length]}px`, animationName: FLOAT_ANIMS[i % FLOAT_ANIMS.length] }}>
-                  <div className="hero-game-name">{g.name}</div>
-                  <span className={`hero-number ${isPending ? 'pending-hero' : ''}`}>{isPending ? '??' : g.today_number}</span>
-                  <div className="hero-meta">
-                    <span className="hero-time">DRAW: {g.draw_time}</span>
-                    {isPending ? <span className="hero-badge" style={{ background: 'rgba(255,230,0,0.15)', color: 'var(--neon-yellow)', border: '1px solid rgba(255,230,0,0.3)' }}>AWAITING</span> : <span className="hero-badge">RESULT</span>}
+        {/* ── HERO BANNER ── */}
+        {topHero && (
+          <section className="banner">
+            <span className="chip">&#9210; लाइव रिजल्ट (LIVE DRAW)</span>
+            <h2>{topHero.name}</h2>
+            <div className="num">
+              {topHero.today_number === 'XX' || topHero.today_number === '--' ? <SpinnerIcon /> : topHero.today_number}
+            </div>
+            <div className="meta">
+              समय: {topHero.draw_time} &nbsp;|&nbsp; कल: {topHero.yesterday_number}
+            </div>
+          </section>
+        )}
+
+        {/* ── QUICK ACTIONS ── */}
+        <div className="actions">
+          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="action green">
+            💬 WhatsApp
+          </a>
+          <a className="action alt" href="#monthly-chart">
+            📊 रिकॉर्ड चार्ट
+          </a>
+          <button className="action" onClick={() => window.location.reload()}>
+            🔄 रिफ्रेश
+          </button>
+        </div>
+
+        {/* ── NOTICE ── */}
+        <div className="notice">
+          <a href="#monthly-chart">सबसे फास्ट रिजल्ट के लिए यहाँ क्लिक करें &bull; हाँ भाई, सबसे पहले खबर यहीं आती है</a>
+        </div>
+
+        {/* ── SEARCH BAR ── */}
+        <div className="search-wrapper">
+          <input
+            type="text"
+            className="search-input-app"
+            placeholder="🔍 गेम सर्च करें (Gali, Desawar, Faridabad...)"
+            value={searchQ}
+            onChange={e => setSearchQ(e.target.value)}
+          />
+        </div>
+
+        {/* ── GAME GRID ── */}
+        <div className="section-heading">
+          <span>गेम लिस्ट (ALL GAMES)</span>
+          <span style={{ fontSize: 13, color: 'var(--dim)' }}>{fmtDay(todayDate)} रिजल्ट्स</span>
+        </div>
+
+        <div className="game-grid">
+          {filtered.map((g) => {
+            const isPending = g.today_number === 'XX' || g.today_number === '--';
+            const chartHref = `/${g.slug || g.code.toLowerCase()}/satta-result-chart/${g.code.toLowerCase()}/`;
+
+            return (
+              <div key={g.code} className="game-card">
+                <span className="ribbon">{fmtDay(todayDate)}</span>
+                <div className={`badge ${isPending ? 'pending' : ''}`}>
+                  {isPending ? <SpinnerIcon /> : g.today_number}
+                </div>
+                <h3>{g.name}</h3>
+                <div className="game-times">
+                  <div>
+                    <b>{g.yesterday_number}</b>
+                    <span>कल</span>
+                  </div>
+                  <div>
+                    <b>{g.draw_time}</b>
+                    <span>समय</span>
+                  </div>
+                  <div>
+                    <b>{g.today_number}</b>
+                    <span>आज</span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="section-head" style={{ marginTop: 40 }}>
-          <span className="section-title">▦ ALL REGIONS</span>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginLeft: 'auto' }}>
-            <span className="section-meta" id="yesterday-label">↩ {fmt(yesterdayDate)}</span>
-            <span className="section-meta" style={{ color: 'var(--neon-pink)' }} id="today-label">⬤ {fmt(todayDate)} (TODAY)</span>
-          </div>
-        </div>
-
-        <div id="quick-board-container">
-          {categories.map(cat => {
-            const catGames = filtered.filter(g => g.category === cat.key);
-            if (!catGames.length) return null;
-            return (
-              <div key={cat.key}>
-                <div className={`cat-label ${cat.cls}`}><span className="cat-label-text">{cat.label}</span></div>
-                <div className="results-grid">
-                  {catGames.map((g, idx) => {
-                    const isPending = g.today_number === 'XX' || g.today_number === '--';
-                    const todayCls  = isPending ? 'pending' : `today${g.is_highlight ? ' is-highlight-num' : ''}`;
-                    const chartHref = `/${g.slug || g.code.toLowerCase()}/satta-result-chart/${g.code.toLowerCase()}/`;
-                    return (
-                      <div key={g.code} className={`game-card ${g.is_highlight ? 'highlight' : ''} ${cat.key === 'NEXT' ? 'cat-next-card' : cat.key === 'REST' ? 'cat-rest-card' : ''}`} id={`card-${g.code}`} style={{ '--float-dur': `${FLOAT_DURS[idx%FLOAT_DURS.length]}s`, '--float-delay': `-${FLOAT_DELAYS[idx%FLOAT_DELAYS.length]}s`, '--float-amp': `${FLOAT_AMPS[idx%FLOAT_AMPS.length]}px`, animationName: FLOAT_ANIMS[idx%FLOAT_ANIMS.length] }}>
-                        <div className="game-info">
-                          <div className="game-title">{g.name}</div>
-                          <div className="game-time">⏰ {g.draw_time}</div>
-                          <Link href={chartHref} className="chart-link" id={`chart-link-${g.code}`}>◈ RECORD CHART →</Link>
-                        </div>
-                        <div className="numbers-wrapper">
-                          <div className="num-box"><span className="num-label">YEST</span><span className="num-badge yesterday">{g.yesterday_number}</span></div>
-                          <div className="num-box"><span className="num-label">TODAY</span><span className={`num-badge ${todayCls}`} id={`num-${g.code}`}>{g.today_number}</span></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <Link href={chartHref} className="game-cta">
+                  चार्ट देखें →
+                </Link>
               </div>
             );
           })}
         </div>
 
-        <div className="section-head" style={{ marginTop: 48 }}>
-          <span className="section-title" id="chart-title">📊 {chartData ? `${MONTH_NAMES[parseInt(chartData.month,10)-1].toUpperCase()} ${chartData.year}` : 'CHART'}</span>
-          <span className="section-meta" id="chart-subtitle">{chartData ? `${chartData.days_in_month} days · Combined chart` : 'Monthly result archive'}</span>
+        {/* ── MONTHLY ARCHIVE TABLE ── */}
+        <div className="section-heading" id="monthly-chart" style={{ marginTop: 36 }}>
+          <span>मासिक रिकॉर्ड चार्ट &mdash; {chartData ? `${MONTH_NAMES[parseInt(chartData.month, 10) - 1]?.toUpperCase()} ${chartData.year}` : 'ARCHIVE'}</span>
         </div>
 
-        <div className="chart-wrapper">
-          <table className="brutalist-table" id="monthly-table" aria-label="Monthly result chart">
-            <thead><tr><th style={{ width: 60 }}>DAY</th><th>DSWR</th><th>FRBD</th><th>GZBD</th><th>GALI</th></tr></thead>
-            <tbody id="mix-chart-tbody">
-              {chartData?.rows?.map(r => {
+        <div className="chart-card-app">
+          <table className="app-table" aria-label="Monthly Satta Chart">
+            <thead>
+              <tr>
+                <th style={{ width: 60 }}>तारीख</th>
+                <th>DESAWAR</th>
+                <th>FARIDABAD</th>
+                <th>GAZIYABAD</th>
+                <th>GALI</th>
+              </tr>
+            </thead>
+            <tbody>
+              {chartData?.rows?.map((r) => {
                 const isToday = r.day === todayDay;
-                const cell = (val) => `${val && val !== 'XX' && val !== '--' ? 'has-num' : ''} ${isToday ? 'today-row' : ''}`;
+                const hasNum = (val) => val && val !== 'XX' && val !== '--';
                 return (
-                  <tr key={r.day}>
-                    <td className="day-col">{r.day}</td>
-                    <td className={`num-col ${cell(r.DS)}`}>{r.DS}</td>
-                    <td className={`num-col ${cell(r.FB)}`}>{r.FB}</td>
-                    <td className={`num-col ${cell(r.GB)}`}>{r.GB}</td>
-                    <td className={`num-col ${cell(r.GL)}`}>{r.GL}</td>
+                  <tr key={r.day} className={isToday ? 'today-row' : ''}>
+                    <td><b>{r.day}</b></td>
+                    <td className={hasNum(r.DS) ? 'has-num' : ''}>{r.DS === 'XX' && isToday ? <SpinnerIcon /> : r.DS}</td>
+                    <td className={hasNum(r.FB) ? 'has-num' : ''}>{r.FB === 'XX' && isToday ? <SpinnerIcon /> : r.FB}</td>
+                    <td className={hasNum(r.GB) ? 'has-num' : ''}>{r.GB === 'XX' && isToday ? <SpinnerIcon /> : r.GB}</td>
+                    <td className={hasNum(r.GL) ? 'has-num' : ''}>{r.GL === 'XX' && isToday ? <SpinnerIcon /> : r.GL}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          <div className="month-nav">
-            <button className="nav-btn" id="prev-month-link" onClick={() => goToMonth(String(prevMIdx+1).padStart(2,'0'), String(prevYear))}>← {MONTH_NAMES[prevMIdx]?.substring(0,3)} {prevYear}</button>
-            <span style={{ fontFamily: 'var(--text-mono)', fontSize: 11, color: 'var(--text-dim)', letterSpacing: 2 }} id="nav-current-month">{chartData ? `${MONTH_NAMES[mIdx]?.substring(0,3).toUpperCase()} ${chartData.year}` : ''}</span>
-            <button className="nav-btn" id="next-month-link" onClick={() => goToMonth(String(nextMIdx+1).padStart(2,'0'), String(nextYear))}>{MONTH_NAMES[nextMIdx]?.substring(0,3)} {nextYear} →</button>
+
+          <div className="app-nav-btns">
+            <button
+              className="app-btn"
+              onClick={() => goToMonth(String(prevMIdx + 1).padStart(2, '0'), String(prevYear))}
+            >
+              ← {MONTH_NAMES[prevMIdx]?.substring(0, 3)} {prevYear}
+            </button>
+            <button
+              className="app-btn"
+              onClick={() => goToMonth(String(nextMIdx + 1).padStart(2, '0'), String(nextYear))}
+            >
+              {MONTH_NAMES[nextMIdx]?.substring(0, 3)} {nextYear} →
+            </button>
           </div>
         </div>
-      </main>
 
-      <footer id="footer">
-        <div className="form-card">
-          <h3>Browse Archive — Select Month &amp; Year</h3>
-          <div className="form-inline">
-            <select id="month" aria-label="Select month" value={chartMonth} onChange={e => setChartMonth(e.target.value)}>
-              {MONTH_NAMES.map((m, i) => (<option key={m} value={String(i+1).padStart(2,'0')}>{m}</option>))}
+        {/* ── APP FOOTER ── */}
+        <footer className="app-footer">
+          <p style={{ color: 'var(--dim)', marginBottom: 12 }}>SATTA KING LIVE APP &bull; FASTEST RESULT PORTAL</p>
+          <div style={{ marginBottom: 16 }}>
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="btn-wa-app">
+              💬 WhatsApp हेल्पलाइन: {WHATSAPP_NUMBER}
+            </a>
+          </div>
+          <div>
+            <select
+              value={chartMonth}
+              onChange={e => setChartMonth(e.target.value)}
+              aria-label="Select month"
+            >
+              {MONTH_NAMES.map((m, i) => (
+                <option key={m} value={String(i + 1).padStart(2, '0')}>{m}</option>
+              ))}
             </select>
-            <select id="year" aria-label="Select year" value={chartYear} onChange={e => setChartYear(e.target.value)}>
-              {[2026,2025,2024,2023,2022].map(y => (<option key={y} value={y}>{y}</option>))}
+            <select
+              value={chartYear}
+              onChange={e => setChartYear(e.target.value)}
+              aria-label="Select year"
+            >
+              {[2026, 2025, 2024, 2023, 2022].map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
 
+      {/* FLOATING WHATSAPP BUTTON */}
+      <div className="floating-wa">
+        <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="app-fab-wa">
+          💬 WhatsApp
+        </a>
+      </div>
+
+      {/* FAB */}
       <div className="floating-bar">
-        <button className="btn-fab fab-refresh" id="btn-refresh" onClick={() => window.location.reload()}>↺ REFRESH</button>
+        <button className="app-fab" onClick={() => window.location.reload()}>
+          ⚡ रिफ्रेश
+        </button>
       </div>
     </div>
   );
