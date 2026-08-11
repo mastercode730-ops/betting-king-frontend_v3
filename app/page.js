@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { STATIC_GAMES, getMockMonthlyChart, WHATSAPP_URL, WHATSAPP_NUMBER } from '../lib/mockData';
+import { WHATSAPP_URL, WHATSAPP_NUMBER } from '../lib/constants';
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -11,31 +11,30 @@ const MONTH_NAMES = [
 const REFRESH_MS = 15_000;
 
 export default function HomePage() {
-  const [games, setGames]           = useState(STATIC_GAMES);
-  const [todayDate, setTodayDate]   = useState(() => new Date().toISOString().split('T')[0]);
-  const [yesterdayDate, setYDate]   = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  });
+  const [games, setGames]           = useState([]);
+  const [todayDate, setTodayDate]   = useState('');
+  const [yesterdayDate, setYDate]   = useState('');
   const [searchQ, setSearchQ]       = useState('');
+  const [syncing, setSyncing]       = useState(false);
   const [chartMonth, setChartMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [chartYear, setChartYear]   = useState(() => String(new Date().getFullYear()));
-  const [chartData, setChartData]   = useState(() => getMockMonthlyChart(String(new Date().getMonth() + 1).padStart(2, '0'), String(new Date().getFullYear())));
+  const [chartData, setChartData]   = useState(null);
 
-  // Fetch today results with fallback
+  // Fetch today results from backend API
   const loadResults = useCallback(async () => {
     try {
+      setSyncing(true);
       const res = await fetch('/api/results/today');
-      if (!res.ok) throw new Error('API failed');
       const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+      if (json.success && Array.isArray(json.data)) {
         setGames(json.data);
         if (json.today_date) setTodayDate(json.today_date);
         if (json.yesterday_date) setYDate(json.yesterday_date);
       }
     } catch (e) {
-      console.warn('[SK] Using static data fallback:', e.message);
+      console.warn('[SK] API failed:', e.message);
+    } finally {
+      setTimeout(() => setSyncing(false), 800);
     }
   }, []);
 
@@ -45,20 +44,17 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, [loadResults]);
 
-  // Load monthly chart with fallback
+  // Load monthly chart from backend API
   const loadChart = useCallback(async (month, year) => {
     try {
       const res = await fetch(`/api/chart/monthly?month=${month}&year=${year}`);
-      if (!res.ok) throw new Error('Chart API failed');
       const json = await res.json();
       if (json.success && json.rows) {
         setChartData(json);
-        return;
       }
     } catch (e) {
-      // Fallback
+      console.warn('[SK] Chart API failed:', e.message);
     }
-    setChartData(getMockMonthlyChart(month, year));
   }, []);
 
   useEffect(() => {
@@ -89,7 +85,7 @@ export default function HomePage() {
   };
 
   const SpinnerIcon = () => (
-    <span className="wait-spinner" title="रिजल्ट का इंतज़ार">
+    <span className="wait-spinner" title="लाइव रिजल्ट का इंतज़ार">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
         <circle cx="12" cy="12" r="9.5" />
         <line className="clock-hand" x1="12" y1="12" x2="12" y2="6.5" />
@@ -106,7 +102,7 @@ export default function HomePage() {
           <span className="lrs-game">{topHero.name}</span>
           <span className="lrs-time">({topHero.draw_time})</span>
           <span className="lrs-arrow">&#10148;</span>
-          <span className="lrs-num">{topHero.today_number === 'XX' || topHero.today_number === '--' ? '??' : topHero.today_number}</span>
+          <span className="lrs-num">{!topHero.today_number || topHero.today_number === 'XX' || topHero.today_number === '--' ? '??' : topHero.today_number}</span>
           <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="btn-wa-app" style={{ padding: '2px 10px', fontSize: '11px', marginLeft: 8 }}>
             💬 WhatsApp
           </a>
@@ -120,7 +116,10 @@ export default function HomePage() {
         <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="btn-wa-app" style={{ marginLeft: 'auto' }}>
           💬 WhatsApp
         </a>
-        <span className="wallet">{games.length} गेम</span>
+        <span className="wallet" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span className="lrs-dot" style={{ background: syncing ? 'var(--gold)' : '#43e660' }} />
+          {syncing ? 'सिंक...' : `${games.length} गेम`}
+        </span>
       </header>
 
       <div className="wrap">
@@ -141,10 +140,10 @@ export default function HomePage() {
             <span className="chip">&#9210; लाइव रिजल्ट (LIVE DRAW)</span>
             <h2>{topHero.name}</h2>
             <div className="num">
-              {topHero.today_number === 'XX' || topHero.today_number === '--' ? <SpinnerIcon /> : topHero.today_number}
+              {!topHero.today_number || topHero.today_number === 'XX' || topHero.today_number === '--' ? <SpinnerIcon /> : topHero.today_number}
             </div>
             <div className="meta">
-              समय: {topHero.draw_time} &nbsp;|&nbsp; कल: {topHero.yesterday_number}
+              समय: {topHero.draw_time} &nbsp;|&nbsp; कल: {topHero.yesterday_number || '—'}
             </div>
           </section>
         )}
@@ -186,7 +185,7 @@ export default function HomePage() {
 
         <div className="game-grid">
           {filtered.map((g) => {
-            const isPending = g.today_number === 'XX' || g.today_number === '--';
+            const isPending = !g.today_number || g.today_number === 'XX' || g.today_number === '--';
             const chartHref = `/${g.slug || g.code.toLowerCase()}/satta-result-chart/${g.code.toLowerCase()}/`;
 
             return (
@@ -198,7 +197,7 @@ export default function HomePage() {
                 <h3>{g.name}</h3>
                 <div className="game-times">
                   <div>
-                    <b>{g.yesterday_number}</b>
+                    <b>{g.yesterday_number || '—'}</b>
                     <span>कल</span>
                   </div>
                   <div>
@@ -206,7 +205,7 @@ export default function HomePage() {
                     <span>समय</span>
                   </div>
                   <div>
-                    <b>{g.today_number}</b>
+                    <b>{g.today_number || '—'}</b>
                     <span>आज</span>
                   </div>
                 </div>
@@ -241,10 +240,10 @@ export default function HomePage() {
                 return (
                   <tr key={r.day} className={isToday ? 'today-row' : ''}>
                     <td><b>{r.day}</b></td>
-                    <td className={hasNum(r.DS) ? 'has-num' : ''}>{r.DS === 'XX' && isToday ? <SpinnerIcon /> : r.DS}</td>
-                    <td className={hasNum(r.FB) ? 'has-num' : ''}>{r.FB === 'XX' && isToday ? <SpinnerIcon /> : r.FB}</td>
-                    <td className={hasNum(r.GB) ? 'has-num' : ''}>{r.GB === 'XX' && isToday ? <SpinnerIcon /> : r.GB}</td>
-                    <td className={hasNum(r.GL) ? 'has-num' : ''}>{r.GL === 'XX' && isToday ? <SpinnerIcon /> : r.GL}</td>
+                    <td className={hasNum(r.DS) ? 'has-num' : ''}>{r.DS === 'XX' && isToday ? <SpinnerIcon /> : (r.DS || '—')}</td>
+                    <td className={hasNum(r.FB) ? 'has-num' : ''}>{r.FB === 'XX' && isToday ? <SpinnerIcon /> : (r.FB || '—')}</td>
+                    <td className={hasNum(r.GB) ? 'has-num' : ''}>{r.GB === 'XX' && isToday ? <SpinnerIcon /> : (r.GB || '—')}</td>
+                    <td className={hasNum(r.GL) ? 'has-num' : ''}>{r.GL === 'XX' && isToday ? <SpinnerIcon /> : (r.GL || '—')}</td>
                   </tr>
                 );
               })}
