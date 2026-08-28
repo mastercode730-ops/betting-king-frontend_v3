@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { WHATSAPP_URL, WHATSAPP_NUMBER } from '../lib/constants';
+import { WHATSAPP_URL, WHATSAPP_NUMBER, REDDY_URL } from '../lib/constants';
 
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
@@ -178,6 +178,12 @@ export default function HomePage() {
 
         {/* ── QUICK ACTIONS ── */}
         <div className="actions">
+          <a href={REDDY_URL} target="_blank" rel="noopener noreferrer" className="action" style={{ background: '#007bff', color: '#fff' }}>
+            🔐 Login
+          </a>
+          <a href={REDDY_URL} target="_blank" rel="noopener noreferrer" className="action" style={{ background: '#28a745', color: '#fff' }}>
+            📝 Register
+          </a>
           <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="action green">
             💬 WhatsApp
           </a>

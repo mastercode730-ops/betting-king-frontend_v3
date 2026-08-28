@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { WHATSAPP_URL, WHATSAPP_NUMBER } from '../../../../lib/constants';
+import { WHATSAPP_URL, WHATSAPP_NUMBER, REDDY_URL } from '../../../../lib/constants';
 
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -104,6 +104,16 @@ export default function GameChartPage() {
             </div>
           </section>
         )}
+
+        {/* ── QUICK ACTIONS ── */}
+        <div className="actions" style={{ margin: '14px 0', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <a href={REDDY_URL} target="_blank" rel="noopener noreferrer" className="action" style={{ background: '#007bff', color: '#fff', flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}>
+            🔐 Login
+          </a>
+          <a href={REDDY_URL} target="_blank" rel="noopener noreferrer" className="action" style={{ background: '#28a745', color: '#fff', flex: 1, textAlign: 'center', padding: '10px', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold' }}>
+            📝 Register
+          </a>
+        </div>
 
         {/* ── YEAR NAV BUTTONS ── */}
         <div className="app-nav-btns" style={{ margin: '20px 0' }}>
