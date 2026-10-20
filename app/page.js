@@ -466,6 +466,13 @@ export default function HomePage() {
               💬 WhatsApp हेल्पलाइन: {WHATSAPP_NUMBER}
             </a>
           </div>
+          <div className="footer-legal-links">
+            <Link href="/privacy">Privacy Policy</Link>
+            <span className="sep">•</span>
+            <Link href="/terms">Terms &amp; Conditions</Link>
+            <span className="sep">•</span>
+            <Link href="/disclaimer">Disclaimer</Link>
+          </div>
           <div>
             <select
               value={chartMonth}

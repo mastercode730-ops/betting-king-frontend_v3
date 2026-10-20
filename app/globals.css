@@ -628,6 +628,31 @@ a {
   margin-top: 36px;
 }
 
+.footer-legal-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 14px 0 16px;
+  font-size: 13.5px;
+}
+
+.footer-legal-links a {
+  color: var(--dim);
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.footer-legal-links a:hover {
+  color: var(--gold);
+}
+
+.footer-legal-links .sep {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+}
+
 .app-footer select {
   padding: 8px 14px;
   background: rgba(0, 0, 0, 0.3);
@@ -637,6 +662,118 @@ a {
   font-family: var(--font-main);
   font-size: 14px;
   margin: 0 4px;
+}
+
+/* ── Legal & Policy Pages (Privacy, Terms, Disclaimer) ──── */
+.legal-page-container {
+  padding: 24px 14px 40px;
+}
+
+.legal-card {
+  background: rgba(18, 68, 78, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 28px 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.legal-header {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
+  margin-bottom: 22px;
+}
+
+.legal-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(245, 179, 1, 0.12);
+  border: 1px solid rgba(245, 179, 1, 0.4);
+  border-radius: 999px;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.legal-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+.legal-subtitle {
+  font-size: 13.5px;
+  color: var(--dim);
+}
+
+.legal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-size: 14.5px;
+  line-height: 1.68;
+  color: #e2e8f0;
+}
+
+.legal-section h2 {
+  font-size: 18px;
+  color: var(--gold);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.legal-section p {
+  margin-bottom: 8px;
+}
+
+.legal-section ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.legal-section li {
+  margin-bottom: 6px;
+}
+
+.disclaimer-alert-box {
+  background: rgba(220, 38, 38, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.legal-footer-nav {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.legal-links-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.legal-links-inline a {
+  color: var(--dim);
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.legal-links-inline a:hover {
+  color: var(--gold);
 }
 
 /* ── Floating FAB ───────────────────────────────────────── */
