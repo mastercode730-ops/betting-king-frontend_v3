@@ -16,10 +16,7 @@ export const metadata = {
     ],
   },
   verification: {
-    google: [
-      'dp4IbX2hBEDSPImsqTcMgO_NhQp-qPgTejAjN7trUkY',
-      'U-5Zhz65SxIHA9xDAUnqZWXKc3cYdAvBfTzIIweGOEU',
-    ],
+    google: 'U-5Zhz65SxIHA9xDAUnqZWXKc3cYdAvBfTzIIweGOEU',
   },
 };
 
